@@ -5,19 +5,19 @@ import { uploadOnCloudinary } from "../utils/cloundary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { fullName, email, userName, password } = req.body;
+  const { fullName, email, username, password } = req.body;
   console.log(email);
 
   // check for free space or date is empty
   if (
-    [fullName, userName, email, password].some((field) => field?.trim() === "")
+    [fullName, username, email, password].some((field) => field?.trim() === "")
   ) {
-    throw new ApiError(400, "All the firld are required");
+    throw new ApiError(400, "All the field are required");
   }
 
   // checking the user thing already here
-  const existedUser = User.findOne({
-    $or: [{ userName }, { email }],
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
   });
 
   if (existedUser) {
@@ -25,7 +25,17 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   // handling images
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  let coverImageLocalPath;
+  // check coverImage is recieved and not
+  if (
+    req.files &&
+    req.files.coverImage &&
+    req.files.coverImage[0] &&
+    req.files.coverImage[0].path
+  ) {
+    coverImageLocalPath = req.files?.coverImage[0]?.path;
+  }
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar should be there ");
@@ -41,17 +51,17 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   //user created
-  await User.create({
+  const newUser = await User.create({
     fullName,
     email,
     password,
     avatar: avatar.url,
     coverImage: coverImage?.url || "",
-    userName: userName.toLowercase(),
+    username: username.toLowerCase(),
   });
 
   //checking user created or not and by using Select we can opt out some fieldby -ve sign
-  const createdUser = await User.findById(User._id).select(
+  const createdUser = await User.findById(newUser._id).select(
     "-password -refreshToken"
   );
 
