@@ -73,9 +73,101 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, createdUser, "User Created"));
 });
 
-export { registerUser };
+const generateTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
-// Algorithum to step what to do
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "Something is wrong with genearting access and refresh Token"
+    );
+  }
+};
+
+const loginUser = asyncHandler(async (req, res) => {
+  const { username, email, password } = req.body;
+
+  if (!email || !username) {
+    throw new ApiError(400, "email or username is required");
+  }
+
+  const newUser = User.findOne({ $or: [{ username }, { email }] });
+
+  if (!newUser) {
+    throw new ApiError(404, "User doesn't exist please register first");
+  }
+
+  //the custom method created at usermodel can only access by instance of User object not by pure object given by mongoose
+  const correctPassword = newUser.isPasswordCorrect(password);
+  if (!correctPassword) {
+    throw new ApiError(404, "Password Incorrect");
+  }
+
+  //heer we get out access and refresh token
+  const { accessToken, refreshToken } = await generateTokens(newUser._id);
+
+  const LoggedInUser = await User.findById(newUser._id).select(
+    "-password -refreshToken"
+  );
+
+  // setup cookies
+  const options = {
+    httponly: true,
+    secure: true,
+  };
+
+  // final response with cookies embeded here
+  return res
+    .status(200)
+    .cookie("accessToekn", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: LoggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "User Logged Succeessfully"
+      )
+    );
+});
+
+const loginOut = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+  const options = {
+    httponly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User Logged Out"));
+});
+
+export { registerUser, loginUser, loginOut };
+
+// Algorithum to step what to do to register User
 // *******************************************
 
 // get user details form the frontend
@@ -87,3 +179,14 @@ export { registerUser };
 // check user create or not
 // remove password and token from respnse user data
 // return response
+
+// Algorithum to step what to do to login User
+// *******************************************
+// 1. get username, email and password
+// 2. check that username exist or not if not them send message to register first
+// 3. comapare the password
+// 4. then generate accesstoken
+
+// 4. login succsessfuly
+// 5. then manage session for that to expire
+// 6. then release refres token
