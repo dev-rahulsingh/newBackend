@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   loginOut,
   loginUser,
+  refreshAcessToken,
   registerUser,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -21,5 +22,5 @@ router.route("/login").post(loginUser);
 // secure routes
 // verifyJWT is middleware as in last we mention next()
 router.route("/logout").post(verifyJWT, loginOut);
-
+router.route("/refresh-token").post(refreshAcessToken);
 export default router;
