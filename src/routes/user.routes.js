@@ -20,6 +20,6 @@ router.route("/register").post(
 router.route("/login").post(loginUser);
 // secure routes
 // verifyJWT is middleware as in last we mention next()
-router.route("logout").post(verifyJWT, loginOut);
+router.route("/logout").post(verifyJWT, loginOut);
 
 export default router;

@@ -3,6 +3,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloundary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import jwt from "jsonwebtoken";
+import { isObjectIdOrHexString } from "mongoose";
 
 const registerUser = asyncHandler(async (req, res) => {
   const { fullName, email, username, password } = req.body;
@@ -76,8 +78,9 @@ const registerUser = asyncHandler(async (req, res) => {
 const generateTokens = async (userId) => {
   try {
     const user = await User.findById(userId);
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    console.log(user);
+    const accessToken = await user.generateAccessToken();
+    const refreshToken = await user.generateRefreshToken();
 
     user.refreshToken = refreshToken;
     await user.save({ validateBeforeSave: false });
@@ -94,18 +97,20 @@ const generateTokens = async (userId) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { username, email, password } = req.body;
 
-  if (!email || !username) {
+  if (!(email || username)) {
     throw new ApiError(400, "email or username is required");
   }
 
-  const newUser = User.findOne({ $or: [{ username }, { email }] });
+  const newUser = await User.findOne({ $or: [{ username }, { email }] });
+  // const newUser = User.findOne({ email });
 
   if (!newUser) {
     throw new ApiError(404, "User doesn't exist please register first");
   }
 
   //the custom method created at usermodel can only access by instance of User object not by pure object given by mongoose
-  const correctPassword = newUser.isPasswordCorrect(password);
+  // const correctPassword = newUser.isPasswordCorrect(password);
+  const correctPassword = await newUser.isPasswordCorrect(password);
   if (!correctPassword) {
     throw new ApiError(404, "Password Incorrect");
   }
@@ -119,14 +124,14 @@ const loginUser = asyncHandler(async (req, res) => {
 
   // setup cookies
   const options = {
-    httponly: true,
-    secure: true,
+    httpOnly: true,
+    secure: false,
   };
 
   // final response with cookies embeded here
   return res
     .status(200)
-    .cookie("accessToekn", accessToken, options)
+    .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
     .json(
       new ApiResponse(
@@ -145,8 +150,8 @@ const loginOut = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1,
       },
     },
     {
@@ -154,8 +159,8 @@ const loginOut = asyncHandler(async (req, res) => {
     }
   );
   const options = {
-    httponly: true,
-    secure: true,
+    httpOnly: true,
+    secure: false,
   };
 
   return res
@@ -164,8 +169,11 @@ const loginOut = asyncHandler(async (req, res) => {
     .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "User Logged Out"));
 });
+//refreshtoken
 
-export { registerUser, loginUser, loginOut };
+
+
+export { registerUser, loginUser, loginOut, refreshAcessToken };
 
 // Algorithum to step what to do to register User
 // *******************************************
