@@ -217,7 +217,26 @@ const refreshAcessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, loginOut, refreshAcessToken };
+const chnageCurrentPassword = asyncHandler(async () => {
+  const { oldPassword, newPassword } = req.body;
+
+  // password will be change as user is already login, login means verifyJWT runs and req.user have user information
+  const user = await User.findById(req.user._id);
+
+  const isPassword = await user.isPasswordCorrect(oldPassword);
+  if (!isPassword) {
+    throw new ApiError(400, "Invalid Password");
+  }
+  user.password = newPassword;
+});
+
+export {
+  registerUser,
+  loginUser,
+  loginOut,
+  refreshAcessToken,
+  chnageCurrentPassword,
+};
 
 // Algorithum to step what to do to register User
 // *******************************************
